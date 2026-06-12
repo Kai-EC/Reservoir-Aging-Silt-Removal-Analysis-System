@@ -1,59 +1,634 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hydro-Agent | 智慧水庫防汛與清淤調度平台</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-slate-900 text-slate-300 font-sans antialiased selection:bg-sky-500/30">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Hydro-Agent 智慧水庫防汛與清淤調度平台 - 整合 IoT, Edge AI 與 3D 數位孿生技術">
+  <meta name="theme-color" content="#0f172a">
+  <meta property="og:title" content="Hydro-Agent 智慧水庫管理平台">
+  <meta property="og:type" content="website">
+  
+  <title>Hydro-Agent | 智慧水庫防汛與清淤調度平台</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <header class="bg-slate-800 border-b border-slate-700 py-4 px-6 md:px-12 flex justify-between items-center shadow-md">
-        <div class="flex items-center gap-3">
-            <span class="text-sky-400 text-2xl">🌊</span>
-            <h1 class="text-xl md:text-2xl font-bold text-white tracking-wider">Hydro-Agent</h1>
+  <style>
+    @keyframes scan { 0% { transform: translateY(-500px); } 100% { transform: translateY(800px); } }
+    .animate-scan { animation: scan 4s linear infinite; }
+    
+    .perspective-grid {
+      background-image: linear-gradient(rgba(56, 189, 248, 0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(56, 189, 248, 0.3) 1px, transparent 1px);
+      background-size: 40px 40px;
+      transform: perspective(600px) rotateX(60deg);
+      transform-origin: top;
+    }
+
+    .bim-structure {
+      transform: perspective(800px) rotateX(55deg) rotateZ(-45deg);
+      transform-style: preserve-3d;
+    }
+    .bim-layer { box-shadow: inset 0 0 20px rgba(56,189,248,0.5), 0 0 20px rgba(56,189,248,0.2); }
+
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* HTML5 Native Progress Bar Styling */
+    progress::-webkit-progress-bar { background-color: #1e293b; border-radius: 9999px; }
+    progress::-webkit-progress-value { background-color: #38bdf8; border-radius: 9999px; }
+    progress.is-amber::-webkit-progress-value { background-color: #f59e0b; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-300 font-sans antialiased h-screen flex overflow-hidden selection:bg-sky-500/30">
+
+  <div id="toast" role="alert" aria-live="assertive" aria-atomic="true" class="fixed top-4 right-4 bg-emerald-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-3 transform transition-all duration-300 translate-x-[150%]">
+    <i class="fa-solid fa-circle-check text-xl" aria-hidden="true"></i>
+    <span id="toast-msg" class="font-medium"></span>
+  </div>
+
+  <aside class="w-16 md:w-64 bg-slate-800 border-r border-slate-700 flex flex-col flex-shrink-0 z-20">
+    <div class="p-4 md:p-6 border-b border-slate-700 flex items-center justify-center md:justify-start gap-3">
+      <i class="fa-solid fa-water text-sky-400 text-2xl" aria-hidden="true"></i>
+      <h1 class="text-white font-bold text-lg tracking-wider hidden md:block">Hydro-Agent</h1>
+    </div>
+    <nav aria-label="主選單" class="flex-1 px-2 md:px-4 py-6 space-y-2 overflow-y-auto no-scrollbar" id="nav-menu">
+      <button aria-current="page" onclick="AppState.view = 'dashboard'" data-target="dashboard" class="nav-btn w-full flex items-center justify-center md:justify-start gap-3 px-2 md:px-4 py-3 rounded-lg font-medium transition-colors group bg-sky-500/10 text-sky-400">
+        <i class="fa-solid fa-chart-line text-xl group-hover:scale-110 transition-transform"></i>
+        <span class="hidden md:block">全區即時監控</span>
+      </button>
+      <button onclick="AppState.view = 'twin'" data-target="twin" class="nav-btn w-full flex items-center justify-center md:justify-start gap-3 px-2 md:px-4 py-3 rounded-lg font-medium transition-colors group text-slate-400 hover:text-white hover:bg-slate-700/50">
+        <i class="fa-solid fa-cube text-xl group-hover:scale-110 transition-transform"></i>
+        <span class="hidden md:block">3D 數位孿生平台</span>
+      </button>
+      <button onclick="AppState.view = 'fleet'" data-target="fleet" class="nav-btn w-full flex items-center justify-center md:justify-start gap-3 px-2 md:px-4 py-3 rounded-lg font-medium transition-colors group text-slate-400 hover:text-white hover:bg-slate-700/50">
+        <i class="fa-solid fa-anchor text-xl group-hover:scale-110 transition-transform"></i>
+        <span class="hidden md:block">智慧清淤調度</span>
+      </button>
+      <button onclick="AppState.view = 'history'" data-target="history" class="nav-btn w-full flex items-center justify-center md:justify-start gap-3 px-2 md:px-4 py-3 rounded-lg font-medium transition-colors group text-slate-400 hover:text-white hover:bg-slate-700/50">
+        <i class="fa-solid fa-clock-rotate-left text-xl group-hover:scale-110 transition-transform"></i>
+        <span class="hidden md:block">歷史時序查詢</span>
+      </button>
+    </nav>
+    <div class="p-4 border-t border-slate-700 text-sm hidden md:block bg-slate-800">
+      <div class="flex items-center justify-between text-slate-400">
+        <span class="flex items-center gap-2"><i class="fa-solid fa-server"></i> 系統狀態</span>
+        <span class="flex items-center gap-1 text-emerald-400"><span class="h-2 w-2 bg-emerald-400 rounded-full animate-pulse"></span> 正常連線</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="flex-1 flex flex-col overflow-hidden relative bg-slate-900">
+    <header class="bg-slate-800 px-4 md:px-8 py-4 border-b border-slate-700 flex justify-between items-center z-10 shadow-md">
+      <h2 class="text-lg md:text-xl font-bold text-white truncate flex items-center gap-2">
+        曾文水庫大盤儀表板
+        <span id="header-api-status" class="hidden text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/30 ml-2" title="資料來源：經濟部水利署">即時政府開放資料</span>
+      </h2>
+      <div class="flex items-center gap-4 md:gap-6">
+        <time id="sys-clock" class="hidden lg:block text-slate-400 text-sm font-mono tracking-wider bg-slate-900 px-3 py-1 rounded-md border border-slate-700"></time>
+        
+        <div class="hidden sm:flex items-center gap-2 text-sm">
+          <span class="px-2 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-xs font-bold" aria-label="網路狀態良好">5G 良好</span>
+          <span class="px-2 py-1 bg-sky-500/20 text-sky-400 border border-sky-500/30 rounded text-xs font-bold" aria-label="邊緣運算待命中">Edge AI 待命</span>
         </div>
-        <nav class="hidden md:flex gap-6">
-            <a href="#" class="text-slate-400 hover:text-white transition-colors">系統介紹</a>
-            <a href="#" class="text-slate-400 hover:text-white transition-colors">數位孿生展示</a>
-            <a href="#" class="text-slate-400 hover:text-white transition-colors">聯絡維運單位</a>
-        </nav>
-        <div>
-            <button class="bg-slate-700 hover:bg-slate-600 border border-slate-500 text-white px-4 py-2 rounded-lg text-sm transition-colors">
-                工程師登入
-            </button>
-        </div>
+        <button aria-label="檢視通知" class="relative group cursor-pointer hover:bg-slate-700 p-2 rounded-full transition-colors">
+          <i class="fa-solid fa-bell text-slate-300 group-hover:text-white text-xl"></i>
+          <span class="absolute top-1 right-1 flex h-3 w-3">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500 border border-slate-900"></span>
+          </span>
+        </button>
+        <button aria-label="使用者帳號設定" class="w-8 h-8 bg-slate-600 hover:bg-slate-500 rounded-full flex items-center justify-center cursor-pointer border border-slate-500 text-white transition-colors">
+          <i class="fa-solid fa-user"></i>
+        </button>
+      </div>
     </header>
 
-    <main class="flex flex-col items-center justify-center min-h-[80vh] px-6 text-center relative overflow-hidden">
+    <div class="flex-1 overflow-y-auto p-4 md:p-8 relative scroll-smooth">
+      
+      <article id="view-dashboard" role="region" aria-label="全區即時監控面板" class="view-section space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 block">
         
-        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-sky-500/20 rounded-full blur-[120px] pointer-events-none"></div>
-
-        <div class="relative z-10">
-            <span class="px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full text-xs font-bold mb-6 inline-block">
-                系統狀態：全區感測器正常連線
-            </span>
-            <h2 class="text-4xl md:text-6xl font-extrabold text-white mb-6 leading-tight">
-                新世代<span class="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-blue-500">智慧水庫</span><br/>防汛與調度平台
-            </h2>
-            <p class="text-lg text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-                整合 IoT 現地感知、Edge AI 邊緣運算與 3D 數位孿生技術，提供零延遲的異重流排砂決策與全自動化清淤船隊巡航調度。
-            </p>
-            
-            <div class="flex flex-col sm:flex-row justify-center gap-4">
-                <button class="bg-sky-500 hover:bg-sky-400 text-white font-bold py-3 px-8 rounded-xl shadow-[0_0_20px_rgba(56,189,248,0.3)] transition-all hover:scale-105">
-                    進入中控儀表板
-                </button>
-                <button class="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold py-3 px-8 rounded-xl transition-all hover:scale-105">
-                    檢視歷史時序分析
-                </button>
+        <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-6">
+          <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg relative overflow-hidden group hover:-translate-y-1 transition-transform">
+            <div class="flex justify-between items-start mb-4">
+              <h3 class="text-slate-400 text-sm font-medium">即時大壩水位 (m)</h3>
+              <i class="fa-solid fa-water text-sky-400 opacity-50 text-2xl"></i>
             </div>
+            <div class="text-3xl font-bold text-white transition-all duration-300" id="val-water-level">--.--</div>
+            <div class="text-sm text-emerald-400 mt-2 flex items-center gap-1">
+              <span class="bg-emerald-500/20 px-1 rounded text-xs text-emerald-300">真實數據</span> 水利署 API
+            </div>
+          </div>
+
+          <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg relative overflow-hidden group hover:-translate-y-1 transition-transform">
+            <div class="flex justify-between items-start mb-4">
+              <h3 class="text-slate-400 text-sm font-medium">有效蓄水率 (%)</h3>
+              <i class="fa-solid fa-database text-sky-400 opacity-50 text-2xl"></i>
+            </div>
+            <div class="text-3xl font-bold text-white"><span id="val-capacity-pct">--.--</span>%</div>
+            <div class="text-sm text-slate-400 mt-2 flex items-center gap-1">
+              容量 <span id="val-capacity">--</span> 萬噸
+            </div>
+          </div>
+
+          <div class="bg-slate-800 p-6 rounded-xl border border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.15)] relative overflow-hidden hover:-translate-y-1 transition-transform">
+            <div class="flex justify-between items-start mb-4">
+              <h3 class="text-amber-500 text-sm font-medium">取水口水質濁度 (NTU)</h3>
+              <i class="fa-solid fa-triangle-exclamation text-amber-500 animate-pulse text-2xl"></i>
+            </div>
+            <div class="text-3xl font-bold text-amber-500" id="val-turbidity">2,450.5</div>
+            <div class="text-sm text-red-400 mt-2 flex items-center gap-1">異重流預測抵達中</div>
+          </div>
+
+          <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg hover:-translate-y-1 transition-transform">
+            <div class="flex justify-between items-start mb-4">
+              <h3 class="text-slate-400 text-sm font-medium">大壩光纖微位移 (mm)</h3>
+              <i class="fa-solid fa-circle-check text-emerald-400 opacity-50 text-2xl"></i>
+            </div>
+            <div class="text-3xl font-bold text-white">0.02</div>
+            <div class="text-sm text-slate-400 mt-2">結構狀態：安全正常</div>
+          </div>
+        </section>
+
+        <section class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div class="bg-slate-800 p-4 md:p-6 rounded-xl border border-slate-700 shadow-lg xl:col-span-2">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-2">
+              <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-microchip text-sky-400"></i> Edge AI 異重流濁度預測
+              </h3>
+              <span class="px-2 py-1 bg-slate-900 rounded text-xs text-slate-400 border border-slate-700 font-mono">架構: 1D-CNN + Bi-LSTM</span>
+            </div>
+            <figure class="h-64 w-full" aria-label="濁度預測折線圖，顯示未來一小時內濁度將先升後降">
+              <canvas id="aiPredictionChart" role="img"></canvas>
+            </figure>
+          </div>
+
+          <div class="bg-slate-800 p-4 md:p-6 rounded-xl border border-slate-700 shadow-lg flex flex-col">
+            <h3 class="text-lg font-bold text-white mb-4">現地防淤決策 (PLC聯動)</h3>
+            <div class="flex-1 bg-slate-900/80 rounded-lg border border-slate-700 p-4 flex flex-col justify-between relative overflow-hidden">
+              <div class="relative z-10">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="flex h-2 w-2 rounded-full bg-sky-400 animate-ping"></span>
+                  <span class="text-sm font-bold text-sky-400">本地推論模式啟動</span>
+                </div>
+                <p class="text-xs text-slate-400 leading-relaxed mb-4">水質探頭偵測顯示，高濃度泥流將於 15 分鐘後抵達庫底進水口。閘道器已準備接管 PLC 邏輯。</p>
+              </div>
+              <div class="relative z-10 space-y-3 mt-4">
+                <div class="flex justify-between items-center text-sm border-b border-slate-700 pb-2">
+                  <span class="text-slate-400">當前排砂閘門開度</span>
+                  <span class="text-white font-bold">15%</span>
+                </div>
+                <div class="flex justify-between items-center text-sm">
+                  <span class="text-amber-500 font-bold">AI 計算最佳開度</span>
+                  <span class="text-amber-500 font-bold text-lg animate-pulse">85%</span>
+                </div>
+                <button onclick="SystemController.notify('已授權！現地 Edge Gateway 正在將閥門微調至 85%...')" class="w-full mt-4 bg-sky-500 hover:bg-sky-400 text-white font-bold py-2.5 px-4 rounded-lg transition-colors shadow-[0_0_15px_rgba(56,189,248,0.2)] flex items-center justify-center gap-2 focus:ring-2 focus:ring-sky-300 outline-none">
+                  <i class="fa-solid fa-microchip"></i> 授權 AI 微調閥門
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <div class="bg-slate-800 rounded-xl border border-slate-700 shadow-lg flex flex-col">
+            <div class="px-6 py-4 border-b border-slate-700">
+              <h3 class="text-white font-bold flex items-center gap-2"><i class="fa-solid fa-leaf text-emerald-400"></i> 清淤循環經濟媒合動態</h3>
+            </div>
+            <div class="p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div class="text-center w-full sm:w-auto bg-slate-900 p-4 rounded-lg border border-slate-700 flex-1">
+                <div class="text-xs text-slate-400 mb-1">本月數位身分證</div>
+                <div class="text-2xl font-bold text-white">12 <span class="text-xs font-normal text-slate-500">批</span></div>
+              </div>
+              <div class="text-center w-full sm:w-auto bg-slate-900 p-4 rounded-lg border border-emerald-500/30 flex-1">
+                <div class="text-xs text-slate-400 mb-1">成功媒合去路</div>
+                <div class="text-2xl font-bold text-emerald-400">10 <span class="text-xs font-normal text-slate-500">批</span></div>
+              </div>
+              <div class="text-center w-full sm:w-auto bg-slate-900 p-4 rounded-lg border border-sky-500/30 flex-1">
+                <div class="text-xs text-slate-400 mb-1">預估減少碳排</div>
+                <div class="text-2xl font-bold text-sky-400">45.2 <span class="text-xs font-normal text-slate-500">噸</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="bg-slate-800 rounded-xl border border-slate-700 shadow-lg flex flex-col">
+            <div class="px-6 py-4 border-b border-slate-700 flex justify-between items-center">
+              <h3 class="text-white font-bold">系統即時日誌</h3>
+            </div>
+            <div class="p-4 space-y-2 flex-1 overflow-y-auto max-h-48 no-scrollbar" role="log">
+              <div class="flex items-start gap-3 p-3 bg-red-500/10 border-l-2 border-red-500 rounded text-sm">
+                <i class="fa-solid fa-triangle-exclamation text-red-500 shrink-0 mt-0.5"></i>
+                <div><p class="font-bold text-white">水質濁度突破警戒閾值</p><p class="text-xs text-slate-400 mt-0.5">已透過 LINE 發送通知。(10:15 AM)</p></div>
+              </div>
+              <div class="flex items-start gap-3 p-3 bg-slate-900 rounded border border-slate-700 text-sm">
+                <i class="fa-solid fa-circle-check text-sky-400 shrink-0 mt-0.5"></i>
+                <div><p class="font-bold text-white">位移感測器校正完成</p><p class="text-xs text-slate-400 mt-0.5">結構狀態正常。(09:00 AM)</p></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </article>
+
+      <article id="view-twin" role="region" aria-label="3D數位孿生視圖" class="view-section h-full flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500 hidden">
+        <div class="w-full h-[calc(100vh-140px)] bg-slate-900 rounded-xl border border-slate-700 overflow-hidden relative shadow-2xl flex flex-col">
+          <div class="bg-slate-800/90 backdrop-blur border-b border-slate-700 p-3 flex justify-between items-center z-10 relative">
+            <div class="flex gap-2" role="group" aria-label="圖層切換控制">
+              <button id="btn-sonar" onclick="AppState.twinLayer = 'sonar'" class="twin-layer-btn bg-sky-500/20 text-sky-400 border border-sky-500/50 px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2 outline-none focus:ring-2 focus:ring-sky-500">
+                <i class="fa-solid fa-water"></i> 多波束聲納圖層
+              </button>
+              <button id="btn-bim" onclick="AppState.twinLayer = 'bim'" class="twin-layer-btn bg-slate-800 text-slate-300 border border-slate-600 px-3 py-1.5 rounded-md text-sm hover:bg-slate-700 transition-colors flex items-center gap-2 outline-none focus:ring-2 focus:ring-sky-500">
+                <i class="fa-solid fa-building"></i> 大壩 BIM 模型
+              </button>
+              <button id="btn-heatmap" onclick="AppState.twinLayer = 'heatmap'" class="twin-layer-btn bg-slate-800 text-slate-300 border border-slate-600 px-3 py-1.5 rounded-md text-sm hover:bg-slate-700 transition-colors flex items-center gap-2 outline-none focus:ring-2 focus:ring-sky-500">
+                <i class="fa-solid fa-fire"></i> 淤積熱區 (Heatmap)
+              </button>
+            </div>
+            <div class="text-slate-400 text-sm flex items-center gap-2" aria-live="polite"><i class="fa-solid fa-cube text-sky-400"></i> 空間模型精度: ±5cm</div>
+          </div>
+          
+          <div class="flex-1 relative overflow-hidden bg-gradient-to-b from-slate-900 to-[#0a1128] flex items-center justify-center">
+            <div class="absolute inset-0 opacity-40 pointer-events-none perspective-grid"></div>
+
+            <div id="layer-sonar" class="twin-layer absolute inset-0 pointer-events-none transition-opacity duration-700 opacity-100">
+                <div class="absolute inset-x-0 h-1 bg-sky-400/50 shadow-[0_0_20px_rgba(56,189,248,0.8)] animate-scan"></div>
+                <div class="absolute top-1/3 left-1/2 w-1 h-1 bg-sky-300 rounded-full shadow-[0_0_5px_#7dd3fc]"></div>
+                <div class="absolute top-1/2 left-1/3 w-1.5 h-1.5 bg-sky-400 rounded-full shadow-[0_0_5px_#38bdf8]"></div>
+                <div class="absolute bottom-1/3 right-1/3 w-1 h-1 bg-sky-200 rounded-full shadow-[0_0_5px_#bae6fd]"></div>
+            </div>
+
+            <div id="layer-bim" class="twin-layer absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity duration-700 opacity-0">
+              <div class="bim-structure w-72 h-72 border-2 border-sky-400/80 bg-sky-500/10 bim-layer rounded-lg flex items-center justify-center relative">
+                <div class="absolute w-full h-full border border-sky-400/40 transform translate-z-10 rounded-lg"></div>
+                <div class="absolute w-full h-full border border-sky-400/20 transform translate-z-20 rounded-lg"></div>
+                <span class="text-sky-400 font-mono text-xl tracking-widest font-bold shadow-sky-500 drop-shadow-md">DAM BIM STRUCTURE</span>
+              </div>
+            </div>
+
+            <div id="layer-heatmap" class="twin-layer absolute inset-0 pointer-events-none transition-opacity duration-700 opacity-0" style="background: radial-gradient(circle at 45% 55%, rgba(239, 68, 68, 0.45) 0%, rgba(245, 158, 11, 0.25) 25%, transparent 60%);">
+              <div class="absolute top-1/2 left-1/2 transform -translate-x-[60%] -translate-y-1/2 w-64 h-64 border-2 border-red-500 border-dashed rounded-full animate-pulse opacity-50"></div>
+            </div>
+
+            <div class="absolute top-1/4 left-1/4 bg-slate-900/80 border border-amber-500/50 p-2.5 rounded shadow-lg text-xs text-amber-400 backdrop-blur z-20">
+              <div class="font-bold mb-1 flex items-center gap-1"><i class="fa-solid fa-map"></i> 嚴重淤積區</div>
+              <div>推估深度: -12.4m</div>
+            </div>
+            
+            <div class="absolute bottom-1/3 right-1/3 bg-slate-900/80 border border-sky-500/50 p-2.5 rounded shadow-lg text-xs text-sky-400 backdrop-blur z-20">
+              <div class="font-bold mb-1 flex items-center gap-1"><i class="fa-solid fa-water"></i> 防淤進水口</div>
+              <div>狀態: 閘門關閉</div>
+            </div>
+
+            <div class="absolute bottom-6 left-6 right-6 bg-slate-800/90 backdrop-blur border border-slate-700 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-center shadow-xl gap-4 z-20">
+              <div>
+                <h4 class="text-white font-bold text-sm mb-2 flex items-center gap-2">
+                  <i class="fa-solid fa-database"></i> 空間幾何運算中... (PostGIS)
+                </h4>
+                <progress value="66" max="100" class="w-64 h-2 mt-1"></progress>
+              </div>
+              <button onclick="SystemController.notify('已匯出最新 3D 庫容計算分析報告 (.pdf)')" class="bg-emerald-500 hover:bg-emerald-400 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2 pointer-events-auto outline-none focus:ring-2 focus:ring-emerald-300">
+                <i class="fa-solid fa-download"></i> 匯出容積計算
+              </button>
+            </div>
+          </div>
         </div>
-    </main>
+      </article>
 
-    <footer class="border-t border-slate-800 py-6 text-center text-sm text-slate-500">
-        <p>&copy; 2026 Hydro-Agent 系統. 版權所有.</p>
-    </footer>
+      <article id="view-fleet" role="region" aria-label="船隊調度視圖" class="view-section flex flex-col lg:flex-row h-full gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 hidden">
+        <div class="flex-[2] bg-slate-900 rounded-xl border border-slate-700 relative overflow-hidden shadow-lg flex flex-col min-h-[500px]">
+          <div class="bg-slate-800 p-4 border-b border-slate-700 text-sm font-bold text-white flex justify-between items-center z-10">
+            <span class="flex items-center gap-2"><i class="fa-solid fa-route text-sky-400"></i> 即時航線最佳化 (Genetic Algorithm)</span>
+            <span class="text-xs font-normal text-emerald-400 flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> RTK 定位正常</span>
+          </div>
+          <div class="flex-1 relative bg-[#0f172a] opacity-90 overflow-hidden" style="background-image: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%)">
+            <svg class="absolute inset-0 w-full h-full opacity-30 pointer-events-none" aria-hidden="true">
+              <path d="M 50 150 Q 250 50 450 200 T 850 150" fill="transparent" stroke="#38bdf8" stroke-width="2"/>
+              <path d="M 0 250 Q 250 200 450 350 T 850 300" fill="transparent" stroke="#38bdf8" stroke-width="1"/>
+            </svg>
+            
+            <div id="sim-usv-a" class="absolute top-[40%] left-[30%] flex flex-col items-center group transition-transform duration-1000 ease-in-out">
+              <span class="bg-sky-500 text-slate-900 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-[0_0_10px_rgba(56,189,248,0.8)] mb-1">USV-A</span>
+              <i class="fa-solid fa-anchor text-sky-400 text-2xl drop-shadow-[0_0_8px_rgba(56,189,248,1)] animate-bounce"></i>
+              <svg class="absolute top-4 left-4 w-40 h-20 overflow-visible pointer-events-none" style="z-index:-1">
+                  <path d="M 0 0 L 80 40 L 150 10" fill="transparent" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4 4" class="animate-pulse"/>
+              </svg>
+            </div>
+            <div id="sim-usv-b" class="absolute top-[60%] left-[60%] flex flex-col items-center transition-transform duration-1000 ease-in-out">
+              <span class="bg-emerald-500 text-slate-900 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-[0_0_10px_rgba(16,185,129,0.8)] mb-1">USV-B</span>
+              <i class="fa-solid fa-anchor text-emerald-400 text-xl transform -rotate-12 drop-shadow-[0_0_8px_rgba(16,185,129,1)]"></i>
+            </div>
+          </div>
+        </div>
 
+        <div class="flex-1 flex flex-col gap-4">
+          <div class="bg-slate-800 rounded-xl border border-slate-700 shadow-lg p-5">
+            <h3 class="text-white font-bold border-b border-slate-700 pb-3 mb-4">線上作業船隊 (Fleet Status)</h3>
+            
+            <section aria-label="USV-A 狀態" class="bg-slate-900 border border-sky-500/30 p-4 rounded-lg mb-4 relative overflow-hidden">
+              <div class="absolute left-0 top-0 bottom-0 w-1 bg-sky-500"></div>
+              <div class="flex justify-between items-center mb-2">
+                <span class="font-bold text-white flex items-center gap-2"><i class="fa-solid fa-anchor text-sky-400"></i> USV-A (主抽泥船)</span>
+                <span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded">作業中</span>
+              </div>
+              <div class="text-xs text-slate-400 mb-4 font-mono">23.26°N, 120.52°E | 完工: 45m</div>
+              <div class="space-y-3">
+                <div class="flex justify-between text-xs text-slate-300 mb-1">
+                  <label for="meter-usva">泥艙容量 (75%)</label>
+                  <span>90m³</span>
+                </div>
+                <progress id="meter-usva" value="75" max="100" class="w-full h-1.5 is-amber"></progress>
+              </div>
+            </section>
+
+            <section aria-label="USV-B 狀態" class="bg-slate-900 border border-slate-700 p-4 rounded-lg relative overflow-hidden">
+              <div class="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500"></div>
+              <div class="flex justify-between items-center mb-2">
+                <span class="font-bold text-white flex items-center gap-2"><i class="fa-solid fa-anchor text-slate-400"></i> USV-B (聲納船)</span>
+                <span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded">掃描中</span>
+              </div>
+              <div class="text-xs text-slate-400 mb-4 font-mono">23.25°N, 120.51°E | 更新 3D 點雲</div>
+              <div class="space-y-3">
+                <div class="flex justify-between text-xs text-slate-300 mb-1">
+                  <label for="progress-usvb">掃描進度 (42%)</label>
+                </div>
+                <progress id="progress-usvb" value="42" max="100" class="w-full h-1.5"></progress>
+              </div>
+            </section>
+          </div>
+          <button onclick="SystemController.notify('正在重啟 Genetic Algorithm 計算所有無人艇之最佳路徑...')" class="w-full bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold py-4 rounded-xl transition-colors shadow flex items-center justify-center gap-2 mt-auto outline-none focus:ring-2 focus:ring-sky-500">
+            <i class="fa-solid fa-route"></i> 一鍵重啟 AI 航線最佳化
+          </button>
+        </div>
+      </article>
+
+      <article id="view-history" role="region" aria-label="歷史資料查詢" class="view-section space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 hidden">
+        <form onsubmit="event.preventDefault(); SystemController.queryHistory();" class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg flex flex-col md:flex-row gap-4 items-end">
+          <div class="flex-1 w-full">
+            <label for="time-range" class="block text-xs font-bold text-slate-400 mb-2">時間區間 (InfluxDB 檢索)</label>
+            <select id="time-range" class="w-full bg-slate-900 border border-slate-700 text-white rounded-lg p-2.5 text-sm focus:border-sky-500 outline-none">
+              <option value="7">最近 7 天 (預設)</option>
+              <option value="30">最近 30 天</option>
+              <option value="typhoon">凱米颱風期間 (2024/07)</option>
+            </select>
+          </div>
+          <div class="flex-1 w-full">
+            <label for="sensor-src" class="block text-xs font-bold text-slate-400 mb-2">感測器資料源</label>
+            <select id="sensor-src" class="w-full bg-slate-900 border border-slate-700 text-white rounded-lg p-2.5 text-sm focus:border-sky-500 outline-none">
+              <option value="quality">取水口水質 (濁度/SS)</option>
+              <option value="displacement">大壩光纖位移計</option>
+            </select>
+          </div>
+          <button type="submit" id="btn-query" class="bg-sky-500 hover:bg-sky-400 disabled:bg-sky-800 disabled:cursor-not-allowed text-white font-medium py-2.5 px-6 rounded-lg text-sm transition-colors shadow flex items-center justify-center w-full md:w-auto h-[42px] outline-none focus:ring-2 focus:ring-sky-300">
+            <i class="fa-solid fa-database mr-2" id="icon-query"></i> <span id="text-query">執行查詢</span>
+          </button>
+        </form>
+
+        <div class="bg-slate-800 rounded-xl border border-slate-700 shadow-lg overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse" aria-label="歷史檢索結果表">
+              <thead>
+                <tr class="bg-slate-900/50 border-b border-slate-700 text-xs text-slate-400 uppercase tracking-wider">
+                  <th scope="col" class="p-4 font-medium">時間戳記 (Timestamp)</th>
+                  <th scope="col" class="p-4 font-medium">測站代碼</th>
+                  <th scope="col" class="p-4 font-medium">濁度 (NTU)</th>
+                  <th scope="col" class="p-4 font-medium">懸浮固體 (SS)</th>
+                  <th scope="col" class="p-4 font-medium">狀態</th>
+                </tr>
+              </thead>
+              <tbody id="history-tbody" class="text-sm text-slate-300 divide-y divide-slate-700/50" aria-live="polite">
+                <tr><td colSpan="5" class="p-8 text-center text-slate-500">請點擊上方按鈕執行查詢</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="p-4 border-t border-slate-700 flex justify-between items-center text-xs text-slate-400 bg-slate-900/30">
+            <span id="history-count">顯示 0 筆，共 0 筆紀錄</span>
+            <button aria-label="導出 CSV 檔案" class="flex items-center gap-1 hover:text-white transition-colors outline-none focus:ring-2 focus:ring-slate-500 rounded px-2">
+              <i class="fa-solid fa-download"></i> 導出 CSV
+            </button>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </main>
+
+  <script>
+    const ApiService = {
+      async fetchReservoirData() {
+        const fallback = { WaterLevel: 224.15, EffectiveCapacity: 38241.5, PercentageOfCapacity: 75.4, Status: 'cors_fallback' };
+        try {
+          const res = await fetch('https://fhy.wra.gov.tw/WraApi/v1/Reservoir/Condition?$filter=StationNo%20eq%20%2730502%27&$format=json', { signal: AbortSignal.timeout(5000) });
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.length) return { ...data[0], Status: 'real_api' };
+          }
+        } catch (e) {
+          console.warn("API Request Failed. Using offline fallback data.", e);
+        }
+        return fallback;
+      },
+      async fetchHistoricalData() {
+        return new Promise(resolve => setTimeout(() => {
+          resolve([
+            { time: '2026-06-12 09:20', station: 'TW-TSW-04', ntu: 2450.5, ss: 1820.0, status: '警戒' },
+            { time: '2026-06-12 09:10', station: 'TW-TSW-04', ntu: 1500.0, ss: 1100.2, status: '警戒' },
+            { time: '2026-06-12 09:00', station: 'TW-TSW-04', ntu: 800.0, ss: 540.5, status: '正常' },
+            { time: '2026-06-12 08:50', station: 'TW-TSW-04', ntu: 350.0, ss: 210.0, status: '正常' }
+          ]);
+        }, 600));
+      }
+    };
+
+    const AppState = new Proxy({
+      view: 'dashboard',
+      twinLayer: 'sonar',
+      chartInstance: null
+    }, {
+      set(target, property, value) {
+        target[property] = value;
+        if (property === 'view') DOMUpdater.updateView(value);
+        if (property === 'twinLayer') DOMUpdater.updateTwinLayer(value);
+        return true;
+      }
+    });
+
+    const DOMUpdater = {
+      updateView(viewId) {
+        document.querySelectorAll('.view-section').forEach(el => {
+          el.classList.add('hidden');
+          el.classList.remove('block');
+        });
+        const targetView = document.getElementById(`view-${viewId}`);
+        if(targetView) {
+          targetView.classList.remove('hidden');
+          targetView.classList.add('block');
+        }
+        
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+          const isActive = btn.getAttribute('data-target') === viewId;
+          btn.setAttribute('aria-current', isActive ? 'page' : 'false');
+          btn.className = `nav-btn w-full flex items-center justify-center md:justify-start gap-3 px-2 md:px-4 py-3 rounded-lg font-medium transition-colors group outline-none focus:ring-2 focus:ring-sky-500 ${
+            isActive ? 'bg-sky-500/10 text-sky-400' : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+          }`;
+        });
+
+        if(viewId === 'dashboard') SystemController.renderChart();
+      },
+
+      updateTwinLayer(layerType) {
+        const layerNames = { sonar: '多波束聲納', bim: '大壩 BIM 模型', heatmap: '淤積熱區 (Heatmap)' };
+        const activeClass = "twin-layer-btn bg-sky-500/20 text-sky-400 border border-sky-500/50 px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2 outline-none focus:ring-2 focus:ring-sky-500";
+        const inactiveClass = "twin-layer-btn bg-slate-800 text-slate-300 border border-slate-600 px-3 py-1.5 rounded-md text-sm hover:bg-slate-700 transition-colors flex items-center gap-2 outline-none focus:ring-2 focus:ring-sky-500";
+
+        ['sonar', 'bim', 'heatmap'].forEach(type => {
+          const btn = document.getElementById(`btn-${type}`);
+          btn.className = (type === layerType) ? activeClass : inactiveClass;
+          btn.setAttribute('aria-pressed', type === layerType);
+
+          const layerEl = document.getElementById(`layer-${type}`);
+          if(type === layerType) {
+            layerEl.classList.remove('opacity-0');
+            layerEl.classList.add('opacity-100');
+          } else {
+            layerEl.classList.remove('opacity-100');
+            layerEl.classList.add('opacity-0');
+          }
+        });
+        SystemController.notify(`已套用：${layerNames[layerType]} 圖層`);
+      }
+    };
+
+    const SystemController = {
+      async init() {
+        const data = await ApiService.fetchReservoirData();
+        document.getElementById('val-water-level').innerText = data.WaterLevel;
+        document.getElementById('val-capacity-pct').innerText = data.PercentageOfCapacity;
+        document.getElementById('val-capacity').innerText = data.EffectiveCapacity;
+        if(data.Status === 'real_api') {
+          document.getElementById('header-api-status').classList.remove('hidden');
+        }
+        
+        this.renderChart();
+        this.startClock();
+        this.startSimulations();
+      },
+
+      startClock() {
+        const clockEl = document.getElementById('sys-clock');
+        setInterval(() => {
+          const now = new Date();
+          // Format specific for visual consistency
+          const timeStr = now.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' }) + ' ' + 
+                          now.toLocaleTimeString('zh-TW', { hour12: false });
+          clockEl.innerText = timeStr;
+          clockEl.setAttribute('datetime', now.toISOString());
+        }, 1000);
+      },
+
+      startSimulations() {
+        // 模擬：水質數據微幅跳動
+        setInterval(() => {
+          if (AppState.view !== 'dashboard') return;
+          const turbEl = document.getElementById('val-turbidity');
+          let baseVal = 2450.5;
+          let randomVariance = (Math.random() * 2 - 1).toFixed(1);
+          turbEl.innerText = (baseVal + parseFloat(randomVariance)).toLocaleString();
+        }, 3000);
+
+        // 模擬：地圖 USV 微幅漂移
+        setInterval(() => {
+          if (AppState.view !== 'fleet') return;
+          const usvA = document.getElementById('sim-usv-a');
+          const usvB = document.getElementById('sim-usv-b');
+          if (usvA && usvB) {
+            const shiftAx = (Math.random() * 4 - 2).toFixed(1);
+            const shiftAy = (Math.random() * 4 - 2).toFixed(1);
+            const shiftBx = (Math.random() * 4 - 2).toFixed(1);
+            const shiftBy = (Math.random() * 4 - 2).toFixed(1);
+            usvA.style.transform = `translate(${shiftAx}px, ${shiftAy}px)`;
+            usvB.style.transform = `translate(${shiftBx}px, ${shiftBy}px)`;
+          }
+        }, 2000);
+      },
+
+      renderChart() {
+        if (AppState.chartInstance) {
+          AppState.chartInstance.destroy();
+        }
+
+        const ctx = document.getElementById('aiPredictionChart').getContext('2d');
+        AppState.chartInstance = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: ['-60m', '-45m', '-30m', '-15m', '現在', '+15m', '+30m', '+45m', '+60m'],
+            datasets: [
+              {
+                label: '實際感測濁度',
+                data: [200, 350, 800, 1500, 2450, null, null, null, null],
+                borderColor: '#38bdf8', borderWidth: 3, pointBackgroundColor: '#0f172a', pointBorderColor: '#38bdf8', pointRadius: 4
+              },
+              {
+                label: 'Edge AI 預測軌跡',
+                data: [null, null, null, null, 2450, 3800, 4500, 3200, 1800],
+                borderColor: '#ef4444', borderWidth: 3, borderDash: [5, 5], pointBackgroundColor: '#0f172a', pointBorderColor: '#ef4444', pointRadius: 4
+              }
+            ]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: '#e2e8f0' } } },
+            scales: {
+              x: { grid: { display: false, color: '#334155' }, ticks: { color: '#94a3b8' } },
+              y: { grid: { color: '#334155', borderDash: [3, 3] }, ticks: { color: '#94a3b8' } }
+            }
+          }
+        });
+      },
+
+      async queryHistory() {
+        const btn = document.getElementById('btn-query');
+        const icon = document.getElementById('icon-query');
+        const text = document.getElementById('text-query');
+        
+        btn.disabled = true;
+        icon.className = "fa-solid fa-spinner fa-spin mr-2";
+        text.innerText = "查詢中...";
+        // 透過 ARIA 告知閱讀器正在載入
+        document.getElementById('history-tbody').setAttribute('aria-busy', 'true');
+
+        const data = await ApiService.fetchHistoricalData();
+        
+        const tbody = document.getElementById('history-tbody');
+        tbody.innerHTML = data.map(row => `
+          <tr class="hover:bg-slate-700/30 transition-colors">
+            <td class="p-4 font-mono text-slate-400">${row.time}</td>
+            <td class="p-4">${row.station}</td>
+            <td class="p-4 font-bold ${row.ntu > 1000 ? 'text-amber-500' : 'text-slate-300'}">${row.ntu}</td>
+            <td class="p-4">${row.ss}</td>
+            <td class="p-4">
+              <span class="px-2.5 py-1 rounded-md text-[10px] font-bold ${row.status === '警戒' ? 'bg-amber-500/20 text-amber-500' : 'bg-emerald-500/20 text-emerald-400'}">
+                ${row.status}
+              </span>
+            </td>
+          </tr>
+        `).join('');
+
+        document.getElementById('history-count').innerText = `顯示 1 至 4 筆，共 1,420 筆紀錄`;
+        
+        btn.disabled = false;
+        icon.className = "fa-solid fa-database mr-2";
+        text.innerText = "執行查詢";
+        document.getElementById('history-tbody').setAttribute('aria-busy', 'false');
+        this.notify('InfluxDB 查詢成功！載入 1,420 筆紀錄。');
+      },
+
+      notify(msg) {
+        const toast = document.getElementById('toast');
+        document.getElementById('toast-msg').innerText = msg;
+        toast.classList.remove('translate-x-[150%]');
+        setTimeout(() => toast.classList.add('translate-x-[150%]'), 3000);
+      }
+    };
+
+    window.onload = () => SystemController.init();
+  </script>
 </body>
 </html>
