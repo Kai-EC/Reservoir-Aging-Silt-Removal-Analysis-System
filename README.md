@@ -70,7 +70,7 @@ Python 3.10+
 安裝與啟動
 
 複製專案：
-git clone [https://github.com/Kai-EC/hydro-agent.git](https://github.com/Kai-EC/hydro-agent.git)
+git clone [https://github.com/Kai-EC/Reservoir-Aging-Silt-Removal-Analysis-System.git](https://github.com/Kai-EC/Reservoir-Aging-Silt-Removal-Analysis-System.git)
     cd hydro-agent
     ```
 2.  **啟動全端容器 (後端、資料庫與 Message Broker)：**
